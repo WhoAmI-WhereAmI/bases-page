@@ -60,26 +60,34 @@ export const BasesPage: QuartzPageTypePlugin<BasesPageOptions> = (opts) => ({
       const folder = lastSlash >= 0 ? filePath.slice(0, lastSlash) : "";
       const dotIndex = filePath.lastIndexOf(".");
       const ext = dotIndex >= 0 ? filePath.slice(dotIndex + 1) : "";
-      const basesSelfContext = {
+      const basesSelfContext: EvalContext["self"] = {
         file: {
           name: baseName,
+          basename: baseName,
           path: filePath,
           folder,
           ext,
+          tags: [],
+          links: [],
         },
       };
+
+      const links = [
+        ...new Set(
+          (basesData.views ?? []).flatMap((view) =>
+            resolveBasesEntries(basesData, allFileData, view, basesSelfContext).entries.map(
+              (e) => e.slug as SimpleSlug,
+            ),
+          ),
+        ),
+      ];
 
       virtualPages.push({
         slug,
         title: baseName,
         data: {
           frontmatter: { title: baseName, tags: [] },
-          links: resolveBasesEntries(
-            basesData,
-            allFileData,
-            undefined,
-            basesSelfContext,
-          ).entries.map((e) => e.slug as SimpleSlug),
+          links,
           basesData,
           basesOptions: opts,
           basesSelfContext,
@@ -139,18 +147,28 @@ function createBasesCodeblockTransform(opts: BasesPageOptions | undefined): Tree
 
       const fd = componentData.fileData as Record<string, unknown>;
       const selfPath = (fd.relativePath ?? fd.filePath ?? slug) as string;
+      const frontmatter = (fd.frontmatter ?? {}) as Record<string, unknown>;
+      const rawLinks = fd.links ?? fd.outgoingLinks;
       const selfName =
         selfPath
           .split("/")
           .pop()
           ?.replace(/\.[^.]+$/, "") ?? "";
       const selfLastSlash = selfPath.lastIndexOf("/");
-      const selfContext = {
+      const selfContext: EvalContext["self"] = {
         file: {
           name: selfName,
+          basename: selfName,
           path: selfPath,
           folder: selfLastSlash >= 0 ? selfPath.slice(0, selfLastSlash) : "",
           ext: selfPath.slice(selfPath.lastIndexOf(".") + 1),
+          tags: Array.isArray(frontmatter.tags)
+            ? frontmatter.tags.filter((tag): tag is string => typeof tag === "string")
+            : [],
+          links: Array.isArray(rawLinks)
+            ? rawLinks.filter((link): link is string => typeof link === "string")
+            : [],
+          properties: frontmatter,
         },
       };
 
